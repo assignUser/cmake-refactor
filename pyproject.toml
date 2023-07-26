@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "cmake-refactor"
+version = "0.1.0"
+description = ""
+authors = ["Jacob Wujciak-Jens <jacob@wujciak.de>"]
+readme = "README.md"
+packages = [{include = "cmake_refactor"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+antlr4-python3-runtime = "^4.13.0"
+
+[tool.pytest.ini_options]
+addopts = "--ignore tests/velox"
+
+[tool.poetry.group.dev.dependencies]
+antlr4-tools = "^0.2"
+pytest = "^7.4.0"
+pytest-diff = "^0.1.14"
+
+[tool.poetry.build]
+generate-setup-file = false
+script = "build.py"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
