@@ -34,7 +34,8 @@ jobs:
     - name: Install dependencies
       run: |
         poetry install --no-root
-        poetry install
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
     - name: Build Package
       run: poetry build
     - name: Run Tests
