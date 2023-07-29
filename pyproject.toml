@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "cmake_refactor"}]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 antlr4-python3-runtime = "^4.13.0"
 
 [tool.pytest.ini_options]
