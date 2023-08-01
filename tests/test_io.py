@@ -74,7 +74,7 @@ def test_get_dep():
 
 
 def test_header_map():
-    #TODO deal with the trailing / in the function
+    # TODO deal with the trailing / in the function
     repo_root = os.path.dirname(velox_dir) + os.path.sep
     file = "CMakeLists.txt"
     repo = velox_dir
@@ -92,3 +92,25 @@ def test_header_map():
 
 def test_full_update():
     io.update_links("velox", os.path.dirname(velox_dir), ["experimental"])
+
+
+def test_reprex():
+    repo_root = os.path.join(current_dir, "reprex/")
+    file = "CMakeLists.txt"
+    files = io.find_files(file, repo_root + "velox/")
+    targets = {}
+    hm = {}
+    for f in files:
+        io.parse_targets(f, targets, header_target_map=hm, repo_root=repo_root)
+
+    io.map_local_headers(targets, hm, repo_root)
+
+    print(targets.values())
+    for t in hm.values():
+        print(t)
+
+    assert targets['io'].private_targets[0] == targets['util']
+    assert targets['io'].private_targets[0] == targets['io'].ppublic_targets[0]
+    assert targets['util'].public_targets[0] == targets['io']
+    assert targets['util'].public_targets[0] ==  targets['util'].ppublic_targets[0] 
+    assert False
