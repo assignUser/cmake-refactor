@@ -69,12 +69,12 @@ class TargetNode:
         message += "\n".join(self.h_includes)
         message += "\nPublic Targets:\n"
         message += "\n".join([t.name for t in self.public_targets])
-        message += "\nPrivate Targets:"
+        message += "\nPrivate Targets:\n"
         message += "\n".join([t.name for t in self.private_targets])
         message += "\nPublic Targets(cml):\n"
         message += "\n".join([t.name for t in self.ppublic_targets])
-        message += "\nPrivate Targets(cml):"
-        message += "\n".join([t.name for t in self.private_targets])
+        message += "\nPrivate Targets(cml):\n"
+        message += "\n".join([t.name for t in self.pprivate_targets])
         return message
 
 
@@ -233,19 +233,12 @@ class UpdateTargetsListener(CMakeListener):
                     if t.is_object_lib or t.is_interface or t.name.startswith("${")
                 ]
             )
-            public_targets.extend(
-                [
-                    t
-                    for t in target.ppublic_targets
-                    if t not in public_targets and t not in private_targets
-                ]
-            )
             public_targets = sort_targets([*set([t.name for t in public_targets])])
             private_targets = sort_targets([*set([t.name for t in private_targets])])
             start = ctx.start.tokenIndex + 2
             stop = ctx.stop.tokenIndex - 1
             p_text = f'PUBLIC {" ".join(public_targets)}' if public_targets else ""
-            pr_text = f' PRIVATE {" ".join(private_targets)}' if private_targets else ""
+            pr_text = f'PRIVATE {" ".join(private_targets)}' if private_targets else ""
             new = f"{target.name} " + p_text + pr_text
             if target.is_interface:
                 new = f'{target.name} INTERFACE {" ".join(sort_targets(public_targets + private_targets))}'

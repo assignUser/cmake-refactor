@@ -73,7 +73,6 @@ def map_local_headers(
     header_target_map: dict[str, [listeners.TargetNode]],
     repo_root: str,
 ):
-
     # header:[dependency targets]
     # todo seperste map for header cpp matching?
     # e.g. for a header with no cpp file
@@ -250,7 +249,9 @@ def update_links(
     src_dir: str, repo_root: str, excluded_dirs: list[str] = [], dry_run: bool = True
 ):
     file = "CMakeLists.txt"
-    repo_root = os.path.abspath(repo_root)
+    # the tariling slash is needed for the prefix removal
+    # note: need posix path TODO enforce
+    repo_root = os.path.abspath(repo_root) + "/"
     files = find_files(file, os.path.join(repo_root, src_dir), excluded_dirs)
     targets: dict[str, listeners.TargetNode] = {}
     hm: dict[str, listeners.TargetNode] = {}
