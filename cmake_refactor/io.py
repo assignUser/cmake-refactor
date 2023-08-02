@@ -247,7 +247,7 @@ def has_matching_src(header: str, sources: list[str], repo_root="") -> bool:
 
 
 def update_links(
-    src_dir: str, repo_root: str, excluded_dirs: list[str] = [], dry_run=True
+    src_dir: str, repo_root: str, excluded_dirs: list[str] = [], dry_run: bool = True
 ):
     file = "CMakeLists.txt"
     repo_root = os.path.abspath(repo_root)

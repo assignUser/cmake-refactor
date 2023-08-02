@@ -6,9 +6,13 @@ authors = ["Jacob Wujciak-Jens <jacob@wujciak.de>"]
 readme = "README.md"
 packages = [{include = "cmake_refactor"}]
 
+[tool.poetry.scripts]
+cmr = "cmake_refactor.main:cli"
+
 [tool.poetry.dependencies]
 python = "^3.10"
 antlr4-python3-runtime = "^4.13.0"
+typer = {extras = ["all"], version = "^0.9.0"}
 
 [tool.pytest.ini_options]
 addopts = "--ignore tests/velox"
