@@ -137,9 +137,11 @@ class TargetInputListener(CMakeListener):
             for f in files
             if os.path.splitext(f)[1] in [".c", ".cpp", ".cxx", ".cc", ".c++"]
         ]
-        headers = [
-            h for h in glob(base_path + "/*.h*") if io.has_matching_src(h, sources)
-        ]
+        headers = [f for f in files if os.path.splitext(f)[1] in [".h", ".hpp"]]
+
+        headers.extend(
+            [h for h in glob(base_path + "/*.h*") if io.has_matching_src(h, sources)]
+        )
 
         node = self.targets.get(target)
         if node is None:
@@ -207,6 +209,9 @@ class UpdateTargetsListener(CMakeListener):
         target = self.targets.get(ctx.target().getText())
         assert target is not None
 
+        if not target.cml_path:
+            return
+
         def sort_targets(targets: list[str]):
             # We want to list the internal targets first
             a = [t for t in targets if t.startswith("velox")]
@@ -220,7 +225,10 @@ class UpdateTargetsListener(CMakeListener):
                 [
                     t
                     for t in target.ppublic_targets
-                    if t.is_object_lib or t.is_interface or t.name.startswith("${")
+                    if target.is_interface
+                    or t.is_object_lib
+                    or t.is_interface
+                    or t.name.startswith("${")
                 ]
             )
             private_targets = [
@@ -237,9 +245,21 @@ class UpdateTargetsListener(CMakeListener):
             private_targets = sort_targets([*set([t.name for t in private_targets])])
             start = ctx.start.tokenIndex + 2
             stop = ctx.stop.tokenIndex - 1
-            p_text = f'PUBLIC {" ".join(public_targets)}' if public_targets else ""
-            pr_text = f'PRIVATE {" ".join(private_targets)}' if private_targets else ""
-            new = f"{target.name} " + p_text + pr_text
+
+            if (
+                len(public_targets) + len(private_targets) == 0
+                and not target.is_interface
+            ):
+                public_targets = [
+                    t.name for t in target.ppublic_targets + target.pprivate_targets
+                ]
+                if len(public_targets) == 0:
+                    print(target)
+                    raise Exception(f"No targets to link to found for `{target.name}`")
+
+            p_text = f' PUBLIC {" ".join(public_targets)}' if public_targets else ""
+            pr_text = f' PRIVATE {" ".join(private_targets)}' if private_targets else ""
+            new = f"{target.name}" + p_text + pr_text
             if target.is_interface:
                 new = f'{target.name} INTERFACE {" ".join(sort_targets(public_targets + private_targets))}'
             self.token_stream.replaceRange(start, stop, new)
