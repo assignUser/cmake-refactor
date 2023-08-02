@@ -1,7 +1,6 @@
 /*
-Copyright (c) 2018  zbq.
 
-License for use and distribution: Eclipse Public License
+License for use and distribution: Eclipse Public License 2.0
 
 CMake language grammar reference:
 https://cmake.org/cmake/help/v3.12/manual/cmake-language.7.html
