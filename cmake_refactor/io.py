@@ -195,6 +195,8 @@ def get_dep_name(header: str) -> str:
             target = "Folly::folly"
         case "fmt":
             target = "fmt::fmt"
+        case "google":
+            target = "google-cloud-cpp::storage"
         case "gflags":
             target = "gflags::gflags"
         case "gtest":
