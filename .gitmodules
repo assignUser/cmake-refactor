@@ -1,6 +1,4 @@
 [submodule "tests/velox"]
 	path = tests/velox
 	url = https://github.com/assignUser/velox
-[submodule "velox"]
-	url = https://github.com/assignUser/velox
 	branch = cmake-refactor-test-branch
