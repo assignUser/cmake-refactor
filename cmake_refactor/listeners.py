@@ -80,7 +80,9 @@ class TargetNode:
 
 class SyntaxErrorListener(ErrorListener):
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
-        raise CancellationException(f"line {line}:{column} {msg}")
+        super().syntaxError(recognizer, offendingSymbol, line, column, msg, e)
+        file_name = recognizer.getInputStream().tokenSource._input.fileName
+        raise CancellationException(f"{file_name} line {line}:{column} {msg}")
 
 
 class TargetInputListener(CMakeListener):
