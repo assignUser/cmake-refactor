@@ -6,7 +6,7 @@ import antlr4 as ant
 
 from . import listeners
 from .parser.CMakeLexer import CMakeLexer
-from .parser.CMakeListener import CMakeListener
+from .parser.CMakeParserListener import CMakeParserListener as CMakeListener
 from .parser.CMakeParser import CMakeParser
 
 
@@ -149,15 +149,16 @@ def map_local_headers(
 def get_dep_name(header: str) -> str:
     name = os.path.splitext(header.lower())[0].split("/")
     header_libs = [
-        "xxhash",
-        "fcntl",
-        "linux",
-        "sys",
-        "limits",
         "date",
-        "time",
-        "pthread",
+        "dlfcn",
+        "fcntl",
         "glob",
+        "limits",
+        "linux",
+        "pthread",
+        "sys",
+        "time",
+        "xxhash",
     ]
     if (
         name[0] in header_libs
