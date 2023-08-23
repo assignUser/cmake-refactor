@@ -26,7 +26,7 @@ def write_token_stream(file_path: str, stream: ant.CommonTokenStream) -> None:
 def walk_stream(stream: ant.CommonTokenStream, listener: CMakeListener):
     parser = CMakeParser(stream)
     parser.addErrorListener(listeners.SyntaxErrorListener())
-    tree = parser.file_()
+    tree = parser.cmake_file()
     walker = ant.ParseTreeWalker()
     walker.walk(listener, tree)
     return listener
