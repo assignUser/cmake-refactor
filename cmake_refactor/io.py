@@ -156,6 +156,7 @@ def get_dep_name(header: str) -> str:
         "limits",
         "linux",
         "pthread",
+        "pwd",
         "sys",
         "time",
         "xxhash",

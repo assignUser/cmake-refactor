@@ -2,7 +2,7 @@ import os
 import re
 from glob import glob
 
-from antlr4 import CommonTokenStream
+from antlr4 import CommonTokenStream, ParserRuleContext
 from antlr4.error.ErrorListener import ErrorListener
 from antlr4.error.Errors import CancellationException
 from antlr4.TokenStreamRewriter import TokenStreamRewriter
@@ -17,7 +17,6 @@ def list_if_none(arg: list | None) -> list:
         return []
     else:
         return arg
-
 
 class TargetNode:
     def __init__(
@@ -88,12 +87,32 @@ class SyntaxErrorListener(ErrorListener):
         file_name = recognizer.getInputStream().tokenSource._input.fileName
         raise CancellationException(f"{file_name} line {line}:{column} {msg}")
 
-
-class TargetInputListener(CMakeListener):
-    def __init__(self, targets, header_target_map=None, repo_root="") -> None:
+class BaseListener(CMakeListener):
+    def __init__(self, targets: dict[str, TargetNode]) -> None:
         super().__init__()
-        self.in_if = False
         self.targets = targets
+
+    def ensure_target(self, target: str) -> TargetNode:
+        node: None | TargetNode = self.targets.get(target)
+        if node is None:
+            node = TargetNode(target)
+            self.targets[target] = node
+
+        return node
+
+    def get_args(self, ctx: ParserRuleContext):
+        """
+        Arguments in CMake can be quoted using '"' but this makes no difference
+        for the parsing in this package so we strip the quotes.
+        """
+        args = [arg.getText() for arg in ctx.arguments().single_argument()]
+        return [arg.replace('"', "") for arg in args]
+
+
+class TargetInputListener(BaseListener):
+    def __init__(self, targets, header_target_map=None, repo_root="") -> None:
+        super().__init__(targets)
+        self.in_if = False
         self.header_target_map = header_target_map
         self.repo_root = repo_root
 
@@ -112,8 +131,7 @@ class TargetInputListener(CMakeListener):
         as we don't want to analyse them).
         """
         cmd = ctx.command.text.lower()
-        args = [arg.getText() for arg in ctx.arguments().single_argument()]
-        args = self.unquote_args(args)
+        args = self.get_args(ctx)
 
         if len(args) == 0:
             raise Exception(f"`{cmd}` called without arguments!")
@@ -151,8 +169,7 @@ class TargetInputListener(CMakeListener):
     def exitModify_target(self, ctx: CMakeParser.Modify_targetContext):
         cmd = ctx.command.text.lower()
 
-        args = [arg.getText() for arg in ctx.arguments().single_argument()]
-        args = self.unquote_args(args)
+        args = self.get_args(ctx)
 
         if cmd == "target_link_libraries":
             self.add_linked_targets(args)
@@ -166,7 +183,7 @@ class TargetInputListener(CMakeListener):
         name = args[0]
         target = self.ensure_target(name)
         # Skip any target_link_library calls after the primary one
-        # as we have no way to model these properly
+        # as we currently have no way to model these properly
         if target.was_linked:
             return
 
@@ -183,10 +200,9 @@ class TargetInputListener(CMakeListener):
         files = [f.replace("${CMAKE_CURRENT_LIST_DIR}/", cml_path) for f in files]
         files = [os.path.join(cml_path, f) for f in files if not os.path.dirname(f)]
         sources, headers = self.sort_files(files)
-        # ??
-        #         headers.extend(
-        #             [h for h in glob(base_path + "/*.h*") if io.has_matching_src(h, sources)]
-        #         )
+        headers.extend(
+            [h for h in glob(cml_path + "/*.h*") if io.has_matching_src(h, sources)]
+        )
         target.headers.extend(headers)
         target.sources.extend(sources)
 
@@ -207,13 +223,6 @@ class TargetInputListener(CMakeListener):
         # This is only explicitly added headers!
         headers = [f for f in files if os.path.splitext(f)[1] in [".h", ".hpp"]]
         return sources, headers
-
-    def unquote_args(self, args: list[str]) -> list[str]:
-        """
-        Arguments in CMake can be quoted using '"' but this makes no difference
-        for the parsing in this package so we strip the quotes.
-        """
-        return [arg.replace('"', "") for arg in args]
 
     def clean_target_args(self, args: list[str]) -> list[str]:
         unused_keywords = [
@@ -268,162 +277,78 @@ class TargetInputListener(CMakeListener):
 
         return targets
 
-    def ensure_target(self, target: str) -> TargetNode:
-        node: None | TargetNode = self.targets.get(target)
-        if node is None:
-            node = TargetNode(target)
-            self.targets[target] = node
 
-        return node
 
-# class TargetInputListener(CMakeListener):
-#     def __init__(
-#         self, target_dict: dict[str, TargetNode], header_target_map=None, repo_root=""
-#     ) -> None:
-#         super().__init__()
-#         self.targets = target_dict
-#         self.repo_root = repo_root
-#         self.header_target_map = header_target_map
-#
-#     def remove_cmake_var(self, items: list[str]) -> list[str]:
-#         cmake_var = re.compile(r"^\$\{.+\}$")
-#         return [i for i in items if not cmake_var.match(i)]
-#
-#     def get_abs_path(self, files: list[str], ctx):
-#         # TODO add check that sources actually exist
-#         return files
-#
-#     def add_linked_targets(
-#         self,
-#         node: TargetNode,
-#         keyword: CMakeParser.KeywordContext,
-#         targets: CMakeParser.TargetContext,
-#     ):
-#         target_names: list[str] = [t.getText() for t in targets]
-#         nodes: list[TargetNode] = []
-#
-#         for target in target_names:
-#             target_node: TargetNode | None = self.targets.get(target)
-#             if target_node is None:
-#                 target_node = TargetNode(target)
-#                 self.targets[target] = target_node
-#             nodes.append(target_node)
-#
-#         if keyword is None or keyword.public() or keyword.interface():
-#             node.ppublic_targets.extend(nodes)
-#         else:
-#             node.pprivate_targets.extend(nodes)
-#
-#
+class UpdateTargetsListener(BaseListener):
+    def __init__(self, targets: dict[str, TargetNode], token_stream: CommonTokenStream):
+        super().__init__(targets)
+        self.token_stream = TokenStreamRewriter(token_stream)
 
-#
-#     def exitLink_libraries(self, ctx: CMakeParser.Link_librariesContext):
-#         # TODO handle executable targets
-#         target: str = ctx.target().getText()
-#         node: TargetNode | None = self.targets.get(target)
-#         if node is None:
-#             node = TargetNode(target)
-#             self.targets[target] = node
-#
-#         # Skip any target_link_library calls after the primary one
-#         # as we have no way to model these properly
-#         if not node.was_linked:
-#             self.add_linked_targets(node, ctx.keyword(), ctx.link_targets().target())
-#
-#             more_targets = ctx.additonal_targets()
-#             if more_targets:
-#                 self.add_linked_targets(
-#                     node, more_targets.keyword(), more_targets.link_targets().target()
-#                 )
-#
-#             node.was_linked = True
-#
-#     def exitAdd_alias(self, ctx: CMakeParser.Add_aliasContext):
-#         alias = ctx.target(0).getText()
-#         target = ctx.target(1).getText()
-#         original: TargetNode | None = self.targets.get(target)
-#         if original is None:
-#             original = TargetNode(target)
-#             self.targets[target] = original
-#
-#         self.targets[alias] = TargetNode(name=alias, alias_for=original)
-#
-#     def exitAdd_interface(self, ctx):
-#         target = ctx.target().getText()
-#         self.targets[target] = TargetNode(name=target, is_interface=True)
-#
-#
-# class UpdateTargetsListener(CMakeListener):
-#     def __init__(self, targets: dict[str, TargetNode], token_stream: CommonTokenStream):
-#         super().__init__()
-#         self.token_stream = TokenStreamRewriter(token_stream)
-#         self.targets = targets
-#
-#     def exitLink_libraries(self, ctx: CMakeParser.Link_librariesContext):
-#         target = self.targets.get(ctx.target().getText())
-#         assert target is not None
-#
-#         if not target.cml_path:
-#             return
-#
-#         def sort_targets(targets: list[str]):
-#             # We want to list the internal targets first
-#             a = [t for t in targets if t.startswith("velox")]
-#             b = [t for t in targets if not t.startswith("velox")]
-#
-#             return sorted(a) + sorted(b)
-#
-#         if not target.was_linked:
-#             public_targets = target.public_targets
-#             public_targets.extend(
-#                 [
-#                     t
-#                     for t in target.ppublic_targets
-#                     if target.is_interface
-#                     or t.is_object_lib
-#                     or t.is_interface
-#                     or t.name.startswith("${")
-#                 ]
-#             )
-#             private_targets = [
-#                 t for t in target.private_targets if t not in public_targets
-#             ]
-#             private_targets.extend(
-#                 [
-#                     t
-#                     for t in target.pprivate_targets
-#                     if t.is_object_lib or t.is_interface or t.name.startswith("${")
-#                 ]
-#             )
-#             public_targets = sort_targets([*set([t.name for t in public_targets])])
-#             private_targets = sort_targets([*set([t.name for t in private_targets])])
-#             start = ctx.start.tokenIndex + 2
-#             stop = ctx.stop.tokenIndex - 1
-#
-#             if (
-#                 len(public_targets) + len(private_targets) == 0
-#                 and not target.is_interface
-#             ):
-#                 public_targets = [
-#                     t.name for t in target.ppublic_targets + target.pprivate_targets
-#                 ]
-#                 if len(public_targets) == 0:
-#                     print(target)
-#                     raise Exception(f"No targets to link to found for `{target.name}`")
-#
-#             p_text = f' PUBLIC {" ".join(public_targets)}' if public_targets else ""
-#             pr_text = f' PRIVATE {" ".join(private_targets)}' if private_targets else ""
-#             new = f"{target.name}" + p_text + pr_text
-#             if target.is_interface:
-#                 new = f'{target.name} INTERFACE {" ".join(sort_targets(public_targets + private_targets))}'
-#             self.token_stream.replaceRange(start, stop, new)
-#             target.was_linked = True
-#         else:
-#             if ctx.keyword() is None:
-#                 # if a target was linked with a keyword all other
-#                 # occurences of target_link_libraries must also use
-#                 # a keyword
-#                 self.token_stream.insertAfter(
-#                     ctx.start.tokenIndex + 3,
-#                     f' {"INTERFACE" if target.is_interface else "PUBLIC"} ',
-#                 )
+    def exitModify_target(self, ctx: CMakeParser.Modify_targetContext):
+        args = self.get_args(ctx)
+        target = self.ensure_target(args[0])
+
+        if not target.cml_path:
+            return
+
+        def sort_targets(targets: list[str]):
+            # We want to list the internal targets first
+            a = [t for t in targets if t.startswith("velox")]
+            b = [t for t in targets if not t.startswith("velox")]
+
+            return sorted(a) + sorted(b)
+
+        if not target.was_linked:
+            public_targets = target.public_targets
+            public_targets.extend(
+                [
+                    t
+                    for t in target.ppublic_targets
+                    if target.is_interface
+                    or t.is_object_lib
+                    or t.is_interface
+                    or t.name.startswith("${")
+                ]
+            )
+            private_targets = [
+                t for t in target.private_targets if t not in public_targets
+            ]
+            private_targets.extend(
+                [
+                    t
+                    for t in target.pprivate_targets
+                    if t.is_object_lib or t.is_interface or t.name.startswith("${")
+                ]
+            )
+            public_targets = sort_targets([*set([t.name for t in public_targets])])
+            private_targets = sort_targets([*set([t.name for t in private_targets])])
+            start = ctx.start.tokenIndex + 2
+            stop = ctx.stop.tokenIndex - 1
+
+            if (
+                len(public_targets) + len(private_targets) == 0
+                and not target.is_interface
+            ):
+                public_targets = [
+                    t.name for t in target.ppublic_targets + target.pprivate_targets
+                ]
+                if len(public_targets) == 0:
+                    print(target)
+                    raise Exception(f"No targets to link to found for `{target.name}`")
+
+            p_text = f' PUBLIC {" ".join(public_targets)}' if public_targets else ""
+            pr_text = f' PRIVATE {" ".join(private_targets)}' if private_targets else ""
+            new = f"{target.name}" + p_text + pr_text
+            if target.is_interface:
+                new = f'{target.name} INTERFACE {" ".join(sort_targets(public_targets + private_targets))}'
+            self.token_stream.replaceRange(start, stop, new)
+            target.was_linked = True
+        else:
+            if ctx.keyword() is None:
+                # if a target was linked with a keyword all other
+                # occurences of target_link_libraries must also use
+                # a keyword
+                self.token_stream.insertAfter(
+                    ctx.start.tokenIndex + 3,
+                    f' {"INTERFACE" if target.is_interface else "PUBLIC"} ',
+                )

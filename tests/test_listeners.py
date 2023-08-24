@@ -8,8 +8,6 @@ cml = os.path.join(current_dir, "files/CMakeLists.txt")
 
 def test_listener_util():
     listener = listeners.TargetInputListener({})
-    quoted_args = ['"some_arg"', "another_one"]
-    assert listener.unquote_args(quoted_args) == ["some_arg", "another_one"]
     # making sure the regex are correct
     dirty_args = [
         "${var}",
@@ -17,7 +15,7 @@ def test_listener_util():
         "$<if:$<nested genexpr>>",
     ]
     assert listener.clean_target_args(dirty_args) == [
-        "${CMAKE_CURRENT_LIST_DIR}/file.h"
+        "${CMAKE_CURRENT_LIST_DIR}/file.h",
     ]
 
 
@@ -75,19 +73,18 @@ def test_link_replacement():
     repo_root = os.path.join(current_dir, "velox")
     file = "CMakeLists.txt"
     repo = os.path.join(repo_root, "velox")
-    files = io.find_files(
-        file, repo, ["proto"]
-    )
+    files = io.find_files(file, repo, ["proto"])
     targets: dict[str, listeners.TargetNode] = {}
     hm = {}
     for f in files:
-        print(f'parsing {f}')
+        print(f"parsing {f}")
         io.parse_targets(f, targets, header_target_map=hm, repo_root=repo_root)
     io.map_local_headers(targets, hm, repo_root)
 
     for t in targets.values():
         t.was_linked = False
 
+    print(targets['velox_caching'])
     token_stream = io.get_token_stream(
         os.path.join(current_dir, "files/caching_cml.txt")
     )
