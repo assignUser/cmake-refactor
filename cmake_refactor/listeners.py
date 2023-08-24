@@ -18,6 +18,7 @@ def list_if_none(arg: list | None) -> list:
     else:
         return arg
 
+
 class TargetNode:
     def __init__(
         self,
@@ -86,6 +87,7 @@ class SyntaxErrorListener(ErrorListener):
         super().syntaxError(recognizer, offendingSymbol, line, column, msg, e)
         file_name = recognizer.getInputStream().tokenSource._input.fileName
         raise CancellationException(f"{file_name} line {line}:{column} {msg}")
+
 
 class BaseListener(CMakeListener):
     def __init__(self, targets: dict[str, TargetNode]) -> None:
@@ -208,7 +210,10 @@ class TargetInputListener(BaseListener):
 
         if self.header_target_map is not None:
             for h in headers:
-                self.header_target_map[h.removeprefix(self.repo_root)] = target
+                if h not in self.header_target_map:
+                    self.header_target_map[h.removeprefix(self.repo_root)] = []
+
+                self.header_target_map[h.removeprefix(self.repo_root)].append(target)
 
     def sort_files(self, files: list[str]) -> tuple[list[str], list[str]]:
         """
@@ -278,7 +283,6 @@ class TargetInputListener(BaseListener):
         return targets
 
 
-
 class UpdateTargetsListener(BaseListener):
     def __init__(self, targets: dict[str, TargetNode], token_stream: CommonTokenStream):
         super().__init__(targets)
@@ -336,6 +340,13 @@ class UpdateTargetsListener(BaseListener):
                     print(target)
                     raise Exception(f"No targets to link to found for `{target.name}`")
 
+            # don't linke to itself
+            if target.name in public_targets:
+                public_targets.remove(target.name)
+
+            if target.name in private_targets:
+                private_targets.remove(target.name)
+
             p_text = f' PUBLIC {" ".join(public_targets)}' if public_targets else ""
             pr_text = f' PRIVATE {" ".join(private_targets)}' if private_targets else ""
             new = f"{target.name}" + p_text + pr_text
@@ -344,11 +355,12 @@ class UpdateTargetsListener(BaseListener):
             self.token_stream.replaceRange(start, stop, new)
             target.was_linked = True
         else:
-            if ctx.keyword() is None:
+            scopes = ["INTERFACE", "PUBLIC", "PRIVATE"]
+            if not any(scope in args for scope in scopes):
                 # if a target was linked with a keyword all other
                 # occurences of target_link_libraries must also use
                 # a keyword
                 self.token_stream.insertAfter(
                     ctx.start.tokenIndex + 3,
-                    f' {"INTERFACE" if target.is_interface else "PUBLIC"} ',
+                    f'{"INTERFACE" if target.is_interface else "PUBLIC"} ',
                 )
