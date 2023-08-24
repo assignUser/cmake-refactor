@@ -92,4 +92,3 @@ def test_link_replacement():
     updated_cml = update_listener.token_stream.getText("default", 0, 999999999)
     print(updated_cml)
     assert "PUBLIC" in updated_cml
-    assert False

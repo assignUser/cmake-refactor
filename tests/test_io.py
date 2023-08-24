@@ -22,21 +22,21 @@ def test_file_roundtrip():
     assert original_contents.splitlines() == new_contents.splitlines()
 
 
-class Listener_test(io.CMakeListener):
+class Listener_test(listeners.BaseListener):
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__({})
         self.counter = 0
 
-    def exitAdd_library(self, ctx: io.CMakeParser.Add_libraryContext):
+    def exitAdd_target(self, ctx: io.CMakeParser.Add_targetContext):
         self.counter += 1
-        print("Found target:", ctx.target().getText())
+        print("Found target:", ctx.arguments().single_argument()[0].getText())
 
 
 def test_listener():
     stream = io.get_token_stream(cml)
     listener = Listener_test()
     io.walk_stream(stream, listener)
-    assert listener.counter == 2
+    assert listener.counter == 6
 
 
 def test_find_file():
@@ -91,7 +91,7 @@ def test_header_map():
 
 
 def test_full_update():
-    io.update_links("velox/", os.path.dirname(velox_dir), ["experimental"])
+    io.update_links("velox/", os.path.dirname(velox_dir), ["proto","external"])
 
 
 def test_full_update_reprex():
@@ -101,7 +101,7 @@ def test_full_update_reprex():
 def test_reprex():
     repo_root = os.path.join(current_dir, "reprex/")
     file = "CMakeLists.txt"
-    files = io.find_files(file, repo_root + "velox/")
+    files = io.find_files(file, repo_root + "velox/", ['proto'])
     targets = {}
     hm = {}
     for f in files:
