@@ -70,21 +70,19 @@ def test_interface_listener():
 
 
 def test_link_replacement():
-    repo_root = os.path.join(current_dir, "velox")
+    repo_root = os.path.join(current_dir, "velox") + '/' 
     file = "CMakeLists.txt"
     repo = os.path.join(repo_root, "velox")
     files = io.find_files(file, repo, ["proto"])
     targets: dict[str, listeners.TargetNode] = {}
     hm = {}
     for f in files:
-        print(f"parsing {f}")
+        # print(f"parsing {f}")
         io.parse_targets(f, targets, header_target_map=hm, repo_root=repo_root)
     io.map_local_headers(targets, hm, repo_root)
 
     for t in targets.values():
         t.was_linked = False
-
-    print(targets['velox_caching'])
     token_stream = io.get_token_stream(
         os.path.join(current_dir, "files/caching_cml.txt")
     )
@@ -94,3 +92,4 @@ def test_link_replacement():
     updated_cml = update_listener.token_stream.getText("default", 0, 999999999)
     print(updated_cml)
     assert "PUBLIC" in updated_cml
+    assert False
