@@ -1,8 +1,8 @@
 Copyright The cmake-refactor contributors
 
 
-The file 'CMake.g4' is based on https://github.com/antlr/grammars-v4/blob/master/cmake/CMake.g4 with 'Copyright (c) 2018  zbq.'
-and is licensed under the Eclipse Public License:
+The files 'CMakeParser.g4' and 'CMakeLexer.g4' are based on https://github.com/antlr/grammars-v4/blob/master/cmake/CMake.g4 with 'Copyright (c) 2018  zbq.'
+and are licensed under the Eclipse Public License:
  
 Eclipse Public License - v 2.0
 

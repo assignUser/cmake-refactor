@@ -30,6 +30,9 @@ target_link_libraries(
   glog::glog
   Folly::folly)
 
+target_link_libraries(velox_caching 
+  ${some_LIBRARIES})
+
 if(${VELOX_BUILD_TESTING})
   add_subdirectory(tests)
 endif()

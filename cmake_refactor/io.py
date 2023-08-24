@@ -6,8 +6,8 @@ import antlr4 as ant
 
 from . import listeners
 from .parser.CMakeLexer import CMakeLexer
-from .parser.CMakeListener import CMakeListener
 from .parser.CMakeParser import CMakeParser
+from .parser.CMakeParserListener import CMakeParserListener as CMakeListener
 
 
 def get_token_stream(file_path: str) -> ant.CommonTokenStream:
@@ -26,7 +26,7 @@ def write_token_stream(file_path: str, stream: ant.CommonTokenStream) -> None:
 def walk_stream(stream: ant.CommonTokenStream, listener: CMakeListener):
     parser = CMakeParser(stream)
     parser.addErrorListener(listeners.SyntaxErrorListener())
-    tree = parser.file_()
+    tree = parser.cmake_file()
     walker = ant.ParseTreeWalker()
     walker.walk(listener, tree)
     return listener
@@ -70,7 +70,7 @@ def get_includes(file_path: str) -> tuple[list[str], list[str]]:
 
 def map_local_headers(
     targets: dict[str, listeners.TargetNode],
-    header_target_map: dict[str, [listeners.TargetNode]],
+    header_target_map: dict[str, list[listeners.TargetNode]],
     repo_root: str,
 ):
     # header:[dependency targets]
@@ -93,10 +93,13 @@ def map_local_headers(
             no_path_h = [
                 os.path.join(cwd.removeprefix(repo_root), h) for h in no_path_h
             ]
+            velox_h.extend(no_path_h)
             # don't parse ddb headers to avoid issues with vendored deps and
             # C stdlib headers
             if target.name not in ["duckdb", "tpch_extension", "dbgen"]:
                 dependencies = [d for h in deps_h if (d := get_dep_name(h))]
+                if 'gtest' in dependencies:
+                    dependencies.append('gtest_main')
                 for dep in dependencies:
                     dep_target = targets.get(dep, listeners.TargetNode(dep))
 
@@ -111,7 +114,7 @@ def map_local_headers(
             cpp_incs.extend([h for h in velox_h if h not in target_h])
         return cpp_incs
 
-    for key, target in targets.items():
+    for _, target in targets.items():
         if target.cml_path is None:
             continue
 
@@ -124,40 +127,70 @@ def map_local_headers(
             *set(resolve_includes(target.headers, target.public_targets))
         ]
 
-    # have to do second pass to avoid mixups
-    for key, target in targets.items():
+    # find header missing a target
+    no_target_h: list[str] = []
+    for _, target in targets.items():
         if target.cml_path is None:
             continue
-        target.private_targets.extend(
-            [
-                t
-                for h in target.cpp_includes
-                if (t := header_target_map.get(h)) is not None
-            ]
+        no_target_h.extend(
+            [h for h in target.cpp_includes if header_target_map.get(h) is None]
         )
-        target.public_targets.extend(
-            [
-                t
-                for h in target.h_includes
-                if (t := header_target_map.get(h)) is not None
-            ]
+        no_target_h.extend(
+            [h for h in target.h_includes if header_target_map.get(h) is None]
         )
 
+    no_target_h = [*set(no_target_h)]
+    target_h = []
+    for h in no_target_h:
+        if any(element in h for element in ["duckdb", "tpch_extension", "dbgen"]):
+            continue
+
+        target_list: list[listeners.TargetNode] = []
+        incs = [*set(resolve_includes([os.path.join(repo_root, h)], target_list))]
+        extend_with_lookup(target_list, header_target_map, incs)
+
+        if target_list:
+            header_target_map[h] = target_list
+
+    # have to do second pass to avoid mixups
+    for _, target in targets.items():
+        if target.cml_path is None:
+            continue
+
+        extend_with_lookup(
+            target.private_targets, header_target_map, target.cpp_includes
+        )
+
+        extend_with_lookup(target.public_targets, header_target_map, target.h_includes)
+
     return header_target_map
+
+
+def extend_with_lookup(extendee: list, dict: dict, keys: list[str]):
+    for k in keys:
+        if k in dict:
+            extendee.extend(dict[k])
 
 
 def get_dep_name(header: str) -> str:
     name = os.path.splitext(header.lower())[0].split("/")
     header_libs = [
-        "xxhash",
-        "fcntl",
-        "linux",
-        "sys",
-        "limits",
+        "altivec",
+        "arm_neon",
+        "assert",
         "date",
-        "time",
-        "pthread",
+        "dlfcn",
+        "fcntl",
         "glob",
+        "limits",
+        "linux",
+        "pthread",
+        "pwd",
+        "spe",
+        "string",
+        "sys",
+        "time",
+        "xxhash",
     ]
     if (
         name[0] in header_libs

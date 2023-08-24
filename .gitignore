@@ -35,3 +35,6 @@ cmake_refactor/parser/CMakeLexer.tokens
 cmake_refactor/parser/CMakeListener.py
 cmake_refactor/parser/CMakeParser.py
 poetry.lock
+cmake_refactor/parser/CMakeParser.interp
+cmake_refactor/parser/CMakeParser.tokens
+cmake_refactor/parser/CMakeParserListener.py

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_library(velox_exception Exceptions.cpp VeloxException.cpp Exceptions.h)
+add_library(velox_exception Exceptions.cpp VeloxException.cpp "Exceptions.h")
 add_library(velox::exception ALIAS velox_exception)
 
 target_link_libraries(
@@ -29,6 +29,7 @@ add_library(
   BitUtil.cpp
   Counters.cpp
   Fs.cpp
+  # comments can be in args
   RandomUtil.cpp
   RawVector.cpp
   RuntimeMetrics.cpp
@@ -40,8 +41,10 @@ target_link_libraries(velox_common_base PUBLIC velox_exception PRIVATE velox_pro
 
 # todo interface targets must inherit the sources of linked targets?
 add_library(velox_interface INTERFACE)
+add_executable(velox_interface_test test.cpp)
 
 if(${VELOX_BUILD_TESTING})
+add_executable(velox_common_base something::conditional)
   add_subdirectory(tests)
 endif()
 
